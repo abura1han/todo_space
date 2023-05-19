@@ -1,113 +1,246 @@
-import Image from 'next/image'
+"use client";
+
+import {
+  DragDropContext,
+  Draggable,
+  DropResult,
+  Droppable,
+} from "react-beautiful-dnd";
+import _ from "lodash";
+import { useEffect, useState } from "react";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { faComments, faFile } from "@fortawesome/free-regular-svg-icons";
+import {
+  faCirclePlus,
+  faEllipsis,
+  faLink,
+} from "@fortawesome/free-solid-svg-icons";
+
+type TodoBoard = Record<string, TodoCol>;
+
+type TodoCol = {
+  title: string;
+  items: TodoItem[];
+};
+
+type TodoItem = {
+  id: string;
+  title: string;
+  description: string;
+  createdAt: Date;
+  updatedAt: Date;
+  comments: [];
+};
 
 export default function Home() {
+  const [state, setState] = useState<TodoBoard>({
+    todo: {
+      title: "Todo",
+      items: [
+        {
+          id: "dfjk",
+          comments: [],
+          createdAt: new Date(),
+          description: "Some description",
+          title: "Some title",
+          updatedAt: new Date(),
+        },
+      ],
+    },
+    "In progress": {
+      title: "In Progress",
+      items: [],
+    },
+    done: {
+      title: "Done",
+      items: [],
+    },
+  });
+
+  // Load  the state from local storage
+  useEffect(() => {
+    const localState = localStorage.getItem("todo-board");
+    if (!localState) return;
+
+    const data = JSON.parse(localState);
+    setState(data);
+  }, []);
+
+  const handleDragEnd = (result: DropResult) => {
+    const { destination, source } = result;
+
+    if (!destination) {
+      return;
+    }
+
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
+    }
+
+    const sourceColumn = state[source.droppableId];
+    const destinationColumn = state[destination.droppableId];
+    const item = sourceColumn.items[source.index];
+
+    // Remove item from the source column
+    sourceColumn.items.splice(source.index, 1);
+
+    // Add item to the destination column
+    destinationColumn.items.splice(destination.index, 0, item);
+
+    setState({ ...state });
+
+    // Save the changes
+    console.log(state);
+    const data = JSON.stringify(state);
+    localStorage.setItem("todo-board", data);
+  };
+
+  const handleAddNewTask = (column: string) => {
+    const newTask: TodoItem = {
+      id: _.uniqueId(),
+      comments: [],
+      createdAt: new Date(),
+      description: "",
+      title: "",
+      updatedAt: new Date(),
+    };
+
+    const columnState = state[column];
+    columnState.items.push(newTask);
+
+    setState({ ...state });
+
+    // Save the changes
+    console.log(state);
+    const data = JSON.stringify(state);
+    localStorage.setItem("todo-board", data);
+  };
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
-        </div>
+    <div className="px-6 py-4">
+      <div className="flex items-center gap-5">
+        <FontAwesomeIcon icon={faFile} size="2x" />
+        <div className="text-2xl font-medium">Kanban Desk</div>
       </div>
+      <div className="grid grid-cols-3 gap-10 mt-10 w-full items-start border-2 border-[#939393] rounded-lg p-6">
+        <DragDropContext onDragEnd={handleDragEnd}>
+          {_.map(state, (data, key) => {
+            return (
+              <div key={key}>
+                <div
+                  className="flex items-center justify-between px-3 py-4 mb-7 border-2 border-[#A9A9AA] rounded-lg bg-[#FCFCFC]"
+                  style={{ boxShadow: "1px 1px 2px #828282" }}
+                >
+                  <h3 className="text-base font-semibold capitalize text-accent-1">
+                    {key}
+                  </h3>
+                  <button
+                    className="flex items-center gap-2 text-sm text-gray-500"
+                    onClick={() => handleAddNewTask(key)}
+                  >
+                    <FontAwesomeIcon icon={faCirclePlus} />
+                    <span className="uppercase font-medium text-[#343539]">
+                      Add new task
+                    </span>
+                  </button>
+                </div>
+                <Droppable droppableId={key}>
+                  {(provided, snapshot) => {
+                    return (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.droppableProps}
+                        className="bg-white flex flex-col gap-5"
+                      >
+                        {data.items.map((item, index) => {
+                          return (
+                            <Draggable
+                              key={item.id}
+                              draggableId={item.id}
+                              index={index}
+                            >
+                              {(provided, snapshot) => {
+                                return (
+                                  <div
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    className="p-5 rounded-lg border-2 border-[#EDEDED] bg-white"
+                                  >
+                                    <div className="flex items-start justify-between">
+                                      <div>
+                                        <h3 className="text-lg font-semibold leading-4 text-accent-2">
+                                          {item.title}
+                                        </h3>
+                                        <small className="text-sm text-accent-3 font-medium">
+                                          {item.description}
+                                        </small>
+                                      </div>
+                                      <div>
+                                        <button className="border  px-2 py-1 rounded-lg">
+                                          <FontAwesomeIcon
+                                            icon={faEllipsis}
+                                            className="text-accent-3"
+                                          />
+                                        </button>
+                                      </div>
+                                    </div>
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
+                                    <div className="mt-14 flex items-center justify-between">
+                                      <div className="px-3 py-2 bg-[#FFF5EF] rounded-lg text-sm text-accent-2 font-medium">
+                                        {item.updatedAt.toLocaleDateString(
+                                          "en",
+                                          {
+                                            day: "numeric",
+                                            month: "long",
+                                            year: "numeric",
+                                          }
+                                        )}
+                                      </div>
+
+                                      <div>
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex items-center gap-2">
+                                            <FontAwesomeIcon
+                                              icon={faComments}
+                                              className="text-accent-3"
+                                            />
+                                            <span className="text-sm text-accent-3">
+                                              4
+                                            </span>
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            <FontAwesomeIcon
+                                              icon={faLink}
+                                              className="text-accent-3"
+                                            />
+                                            <span className="text-sm text-accent-3">
+                                              4
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              }}
+                            </Draggable>
+                          );
+                        })}
+                        {provided.placeholder}
+                      </div>
+                    );
+                  }}
+                </Droppable>
+              </div>
+            );
+          })}
+        </DragDropContext>
       </div>
-
-      <div className="mb-32 grid text-center lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+    </div>
+  );
 }
