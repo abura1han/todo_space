@@ -7,7 +7,7 @@ import {
   Droppable,
 } from "react-beautiful-dnd";
 import _ from "lodash";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faComments, faFile } from "@fortawesome/free-regular-svg-icons";
 import {
@@ -15,6 +15,10 @@ import {
   faEllipsis,
   faLink,
 } from "@fortawesome/free-solid-svg-icons";
+import Modal from "@/components/Modal";
+import MoreOptionButton from "@/components/MoreOptionButton";
+
+type Column = "todo" | "in progress" | "done";
 
 type TodoBoard = Record<string, TodoCol>;
 
@@ -36,18 +40,9 @@ export default function Home() {
   const [state, setState] = useState<TodoBoard>({
     todo: {
       title: "Todo",
-      items: [
-        {
-          id: "dfjk",
-          comments: [],
-          createdAt: new Date(),
-          description: "Some description",
-          title: "Some title",
-          updatedAt: new Date(),
-        },
-      ],
+      items: [],
     },
-    "In progress": {
+    "in progress": {
       title: "In Progress",
       items: [],
     },
@@ -57,13 +52,36 @@ export default function Home() {
     },
   });
 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentColumn, setCurrentColumn] = useState<Column>("todo");
+  const [currentTask, setCurrentTask] = useState<TodoItem>();
+
   // Load  the state from local storage
   useEffect(() => {
     const localState = localStorage.getItem("todo-board");
     if (!localState) return;
 
-    const data = JSON.parse(localState);
-    setState(data);
+    const todoData = JSON.parse(localState);
+
+    const transportTodoData = _.map(todoData, (data, key) => {
+      return {
+        ...data,
+        items: _.map(data.items, (item) => {
+          return {
+            ...item,
+            createdAt: new Date(item.createdAt),
+            updatedAt: new Date(item.updatedAt),
+          };
+        }),
+      };
+    });
+
+    setState({
+      todo: transportTodoData[0],
+      "In progress": transportTodoData[1],
+      done: transportTodoData[2],
+    });
   }, []);
 
   const handleDragEnd = (result: DropResult) => {
@@ -93,18 +111,20 @@ export default function Home() {
     setState({ ...state });
 
     // Save the changes
-    console.log(state);
     const data = JSON.stringify(state);
     localStorage.setItem("todo-board", data);
   };
 
-  const handleAddNewTask = (column: string) => {
+  const handleAddNewTask = (
+    { description, title }: { title: string; description: string },
+    column: string
+  ) => {
     const newTask: TodoItem = {
       id: _.uniqueId(),
       comments: [],
       createdAt: new Date(),
-      description: "",
-      title: "",
+      description,
+      title,
       updatedAt: new Date(),
     };
 
@@ -114,20 +134,82 @@ export default function Home() {
     setState({ ...state });
 
     // Save the changes
-    console.log(state);
     const data = JSON.stringify(state);
     localStorage.setItem("todo-board", data);
   };
 
+  const handleEditTask = (id: string, column: Column) => {
+    const columnState = state[column];
+    const task = columnState.items.find((item) => item.id === id);
+
+    setIsEditing(true);
+
+    if (!task) return;
+
+    setCurrentTask(task);
+    setIsModalOpen(true);
+    setCurrentColumn(column);
+  };
+
+  const handleDeleteTask = (id: string, column: Column) => {
+    const columnState = state[column];
+
+    columnState.items = columnState.items.filter((item) => item.id !== id);
+    setState({ ...state, [column]: columnState });
+
+    // Save to local storage
+    localStorage.setItem("todo-board", JSON.stringify(state));
+  };
+
   return (
     <div className="px-6 py-4">
+      <Modal
+        isOpen={isModalOpen}
+        columnState={currentColumn}
+        defaultFormData={{
+          title: currentTask?.title || "",
+          description: currentTask?.description || "",
+        }}
+        onClose={() => {
+          setIsModalOpen(false);
+        }}
+        onSubmit={(e, data) => {
+          e.preventDefault();
+
+          // Update task
+          if (isEditing) {
+            const columnState = state[data.columnState];
+            const task = columnState.items.find(
+              (item) => item.id === currentTask?.id
+            );
+            if (!task) return;
+            task.title = data.title;
+            task.description = data.description;
+            task.updatedAt = new Date();
+            setState({ ...state });
+            setIsEditing(false);
+
+            // Set to local storage
+            localStorage.setItem("todo-board", JSON.stringify(state));
+          } else {
+            // Create new task
+            handleAddNewTask(
+              { title: data.title, description: data.description },
+              data.columnState
+            );
+          }
+
+          setIsModalOpen(false);
+          setCurrentTask(undefined);
+        }}
+      />
       <div className="flex items-center gap-5">
         <FontAwesomeIcon icon={faFile} size="2x" />
         <div className="text-2xl font-medium">Kanban Desk</div>
       </div>
       <div className="grid grid-cols-3 gap-10 mt-10 w-full items-start border-2 border-[#939393] rounded-lg p-6">
         <DragDropContext onDragEnd={handleDragEnd}>
-          {_.map(state, (data, key) => {
+          {_.map(state, (data, key: "todo" | "in progress" | "done") => {
             return (
               <div key={key}>
                 <div
@@ -139,7 +221,10 @@ export default function Home() {
                   </h3>
                   <button
                     className="flex items-center gap-2 text-sm text-gray-500"
-                    onClick={() => handleAddNewTask(key)}
+                    onClick={() => {
+                      setIsModalOpen(true);
+                      setCurrentColumn(key);
+                    }}
                   >
                     <FontAwesomeIcon icon={faCirclePlus} />
                     <span className="uppercase font-medium text-[#343539]">
@@ -179,19 +264,19 @@ export default function Home() {
                                           {item.description}
                                         </small>
                                       </div>
-                                      <div>
-                                        <button className="border  px-2 py-1 rounded-lg">
-                                          <FontAwesomeIcon
-                                            icon={faEllipsis}
-                                            className="text-accent-3"
-                                          />
-                                        </button>
-                                      </div>
+                                      <MoreOptionButton
+                                        onEdit={() =>
+                                          handleEditTask(item.id, key)
+                                        }
+                                        onDelete={() =>
+                                          handleDeleteTask(item.id, key)
+                                        }
+                                      />
                                     </div>
 
                                     <div className="mt-14 flex items-center justify-between">
                                       <div className="px-3 py-2 bg-[#FFF5EF] rounded-lg text-sm text-accent-2 font-medium">
-                                        {item.updatedAt.toLocaleDateString(
+                                        {item.updatedAt?.toLocaleDateString(
                                           "en",
                                           {
                                             day: "numeric",
