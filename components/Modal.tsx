@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 type ColumnState = "todo" | "in progress" | "done";
 
@@ -25,10 +25,18 @@ const Modal: React.FC<ModalProps> = ({
   onClose,
   onSubmit,
 }) => {
-  const [title, setTitle] = useState(defaultFormData?.title ?? "");
-  const [description, setDescription] = useState(
-    defaultFormData?.description ?? ""
-  );
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+
+  useEffect(() => {
+    setTitle(defaultFormData?.title ?? "");
+    setDescription(defaultFormData?.description ?? "");
+  }, [defaultFormData?.description, defaultFormData?.title]);
+
+  const handleResetForm = () => {
+    setTitle("");
+    setDescription("");
+  };
 
   return (
     <>
@@ -36,12 +44,16 @@ const Modal: React.FC<ModalProps> = ({
         <div className="fixed inset-0 flex items-center justify-center z-50">
           <div
             className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-            onClick={onClose}
+            onClick={() => {
+              handleResetForm();
+              onClose();
+            }}
           ></div>
           <form
             className="bg-white rounded-lg p-8 shadow-2xl z-20 flex flex-col gap-4"
             onSubmit={(e) => {
               onSubmit(e, { title, description, columnState });
+              handleResetForm();
             }}
           >
             <input

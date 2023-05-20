@@ -172,6 +172,8 @@ export default function Home() {
         }}
         onClose={() => {
           setIsModalOpen(false);
+          // @ts-ignore
+          setCurrentTask((p) => ({ ...p, title: "", description: "" }));
         }}
         onSubmit={(e, data) => {
           e.preventDefault();
@@ -200,14 +202,16 @@ export default function Home() {
           }
 
           setIsModalOpen(false);
-          setCurrentTask(undefined);
+
+          // @ts-ignore
+          setCurrentTask((p) => ({ ...p, title: "", description: "" }));
         }}
       />
       <div className="flex items-center gap-5">
         <FontAwesomeIcon icon={faFile} size="2x" />
         <div className="text-2xl font-medium">Kanban Desk</div>
       </div>
-      <div className="grid grid-cols-3 gap-10 mt-10 w-full items-start border-2 border-[#939393] rounded-lg p-6">
+      <div className="grid grid-cols-3 gap-10 mt-10 w-full min-h-[calc(100vh-110px)] items-start border-2 border-[#939393] rounded-lg p-6">
         <DragDropContext onDragEnd={handleDragEnd}>
           {_.map(state, (data, key: "todo" | "in progress" | "done") => {
             return (
